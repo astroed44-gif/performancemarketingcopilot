@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════
-   LoanGrowth AI Copilot — Frontend App
+   Performance Marketing Copilot — Frontend App
    ═══════════════════════════════════════════════════════ */
 
 'use strict';

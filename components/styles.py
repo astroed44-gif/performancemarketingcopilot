@@ -1,4 +1,4 @@
-"""Custom CSS for the LoanGrowth AI Copilot — clean SaaS design."""
+"""Custom CSS for the Performance Marketing Copilot — clean SaaS design."""
 
 CUSTOM_CSS = """
 <style>

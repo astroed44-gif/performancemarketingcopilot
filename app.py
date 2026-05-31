@@ -1,4 +1,4 @@
-"""LoanGrowth AI Copilot — Flask web server.
+"""Performance Marketing Copilot — Flask web server.
 Run: python3 app.py
 """
 from __future__ import annotations
@@ -220,5 +220,5 @@ def api_evidence():
 
 
 if __name__ == "__main__":
-    print("\n🚀  LoanGrowth AI Copilot  →  http://localhost:5000\n")
+    print("\n🚀  Performance Marketing Copilot  →  http://localhost:5000\n")
     app.run(debug=True, port=5000, threaded=True)
