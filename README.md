@@ -1,9 +1,9 @@
 # 🤖 Performance Marketing Copilot
 
-[![License: MIT](https://img.shields.shields.shields.shields.shields.shields.shields.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python Version](https://img.shields.shields.shields.shields.shields.shields.shields.io/badge/Python-3.9+-blue.svg)](https://www.python.org/)
-[![PRs Welcome](https://img.shields.shields.shields.shields.shields.shields.shields.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
-[![Open Source](https://img.shields.shields.shields.shields.shields.shields.shields.shields.io/badge/Open_Source-❤-red.svg)](#)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python Version](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://www.python.org/)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+[![Open Source](https://img.shields.io/badge/Open_Source-%E2%9D%A4-red.svg)](#)
 
 An agentic, multi-specialist performance marketing Copilot framework designed to connect top-of-funnel ad campaigns with bottom-of-funnel business outcomes.
 
