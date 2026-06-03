@@ -1,5 +1,6 @@
 # 🤖 Performance Marketing Copilot
 
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-loangrowth--ai--copilot.vercel.app-black?logo=vercel)](https://loangrowth-ai-copilot.vercel.app)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python Version](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://www.python.org/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
@@ -32,7 +33,7 @@ The copilot operates over a unified data model that connects top-of-funnel ad sp
 
 ## 🧠 System Architecture
 
-The application is built on a **Flask + Vanilla JS** stack, powered by **LangChain** and **OpenAI (GPT-4o)** using a multi-agent orchestration pattern.
+The application is built on a **Flask + Vanilla JS** stack, powered by **LangChain** and **Anthropic Claude (Haiku 4.5)** using a multi-agent orchestration pattern.
 
 ### 1. The Multi-Agent Pipeline
 When a user asks a question, it flows through a strict, 3-layer agentic architecture:
@@ -90,9 +91,9 @@ To customize the Copilot for your business (e.g., SaaS subscription funnels or e
     pip install -r requirements.txt
     ```
 2.  **Environment Variables:**
-    Create a `.env` file in the root directory and add your OpenAI API key:
+    Create a `.env` file in the root directory and add your Anthropic API key:
     ```env
-    OPENAI_API_KEY=sk-your-api-key
+    ANTHROPIC_API_KEY=sk-ant-your-api-key
     ```
 3.  **Run the server:**
     ```bash
