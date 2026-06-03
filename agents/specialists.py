@@ -2,15 +2,8 @@
 Specialist agents — each wraps a tool call + LLM reasoning pass.
 """
 from __future__ import annotations
+import re
 import pandas as pd
-from langchain_openai import ChatOpenAI
-
-
-def _df_to_records(obj):
-    """Convert a DataFrame to a list of dicts, or return obj unchanged."""
-    if isinstance(obj, pd.DataFrame):
-        return obj.round(3).to_dict(orient="records")
-    return obj or []
 from langchain_core.messages import SystemMessage, HumanMessage
 from agents.tools import (
     analyze_ad_performance,
@@ -21,36 +14,53 @@ from agents.tools import (
     get_winning_creatives,
 )
 
+
+def _df_to_records(obj):
+    """Convert a DataFrame to a list of dicts, or return obj unchanged."""
+    if isinstance(obj, pd.DataFrame):
+        return obj.round(3).to_dict(orient="records")
+    return obj or []
+
+
+def _strip_em_dashes(text: str) -> str:
+    """Replace em dashes and related Unicode dashes with a plain hyphen."""
+    for ch in "\u2014\u2013\u2012\u2015":
+        text = text.replace(ch, "-")
+    return text
+
+
+_NO_EM_DASH = "\nSTYLE: Never use em dashes (—). Use a plain hyphen (-) instead. Be concise and direct.\n"
+
 _CHITCHAT_SYS = """You are a friendly AI marketing assistant for a digital lending app in India.
 The user said something conversational. Reply warmly in 1-2 sentences, remind them what you can help with
 (ad performance, funnel analysis, creative strategy, borrower quality, copy generation), and invite a follow-up question.
-Do NOT output JSON. Do NOT mention any ad names or specific data."""
+Do NOT output JSON. Do NOT mention any ad names or specific data.""" + _NO_EM_DASH
 
 _PERFORMANCE_SYS = """You are a performance marketing analyst for a digital lending app in India.
 Given ad performance data, identify the top and bottom performing ads by quality score
-(which factors in KYC completion, approval rate, repayment rate, and default rate — not just CPI).
-Be concise. Focus on actionable insights. Use ₹ for currency."""
+(which factors in KYC completion, approval rate, repayment rate, and default rate - not just CPI).
+Be concise. Focus on actionable insights. Use Rs for currency.""" + _NO_EM_DASH
 
 _CREATIVE_SYS = """You are a creative strategist for a digital lending app.
 Given creative pattern data, identify which copy angles, hooks, and trust/urgency levels
 correlate with high borrower quality (KYC completion + repayment rate).
-Distinguish between creatives that get cheap installs vs those that get good borrowers."""
+Distinguish between creatives that get cheap installs vs those that get good borrowers.""" + _NO_EM_DASH
 
 _FUNNEL_SYS = """You are a growth analyst specializing in mobile app funnels for lending apps.
 Given funnel drop-off data, identify where users are dropping out most and what that implies
-(clickbait = high CTR but low KYC; loan offer mismatch = high approval but low disbursal)."""
+(clickbait = high CTR but low KYC; loan offer mismatch = high approval but low disbursal).""" + _NO_EM_DASH
 
 _BORROWER_QUALITY_SYS = """You are a credit risk and marketing analyst for a digital lending app.
 Given borrower quality data (repayment, default, approval rates), identify which ads are attracting
-genuinely creditworthy borrowers vs just cheap installs. Focus on profitability, not just volume."""
+genuinely creditworthy borrowers vs just cheap installs. Focus on profitability, not just volume.""" + _NO_EM_DASH
 
 _COPY_GEN_SYS = """You are a performance marketing copywriter for a digital lending app in India.
 Given the winning creative patterns (high borrower quality, high repayment), write 5 new ad copy variants.
-Format: numbered list. Each variant: Hook | Body (1 line) | CTA. Keep under 30 words each."""
+Format: numbered list. Each variant: Hook | Body (1 line) | CTA. Keep under 30 words each.""" + _NO_EM_DASH
 
 _PLATFORM_SYS = """You are a media buyer for a digital lending app running campaigns on Meta and Google.
-Compare platform-level performance — not just CPI and spend, but downstream borrower quality.
-Recommend budget allocation based on quality-adjusted CAC."""
+Compare platform-level performance - not just CPI and spend, but downstream borrower quality.
+Recommend budget allocation based on quality-adjusted CAC.""" + _NO_EM_DASH
 
 
 def _filter_ctx(filters: dict) -> str:
@@ -74,63 +84,63 @@ def _build_messages(sys_prompt: str, question: str, history: list = None) -> lis
     return msgs
 
 
-def run_chitchat_agent(data: dict, filters: dict, question: str, llm: ChatOpenAI, history: list = None) -> dict:
+def run_chitchat_agent(data: dict, filters: dict, question: str, llm, history: list = None) -> dict:
     response = llm.invoke(_build_messages(_CHITCHAT_SYS, question, history))
     return {
         "agent": "chitchat_agent",
-        "insight": response.content,
+        "insight": _strip_em_dashes(response.content),
         "data_summary": {},
         "tables_used": [],
         "tools_called": [],
     }
 
 
-def run_performance_agent(data: dict, filters: dict, question: str, llm: ChatOpenAI, history: list = None) -> dict:
+def run_performance_agent(data: dict, filters: dict, question: str, llm, history: list = None) -> dict:
     tool_result = analyze_ad_performance(data, filters)
     prompt = f"{_filter_ctx(filters)}User question: {question}\n\nData:\n{tool_result['summary']}"
     response = llm.invoke(_build_messages(_PERFORMANCE_SYS, prompt, history))
     return {
         "agent": "performance_agent",
-        "insight": response.content,
+        "insight": _strip_em_dashes(response.content),
         "data_summary": {"table": _df_to_records(tool_result.get("table"))},
         "tables_used": tool_result["tables_used"],
         "tools_called": [tool_result["tool"]],
     }
 
 
-def run_creative_agent(data: dict, filters: dict, question: str, llm: ChatOpenAI, history: list = None) -> dict:
+def run_creative_agent(data: dict, filters: dict, question: str, llm, history: list = None) -> dict:
     tool_result = analyze_creative_patterns(data, filters)
     prompt = f"{_filter_ctx(filters)}User question: {question}\n\nData:\n{tool_result['summary']}"
     response = llm.invoke(_build_messages(_CREATIVE_SYS, prompt, history))
     return {
         "agent": "creative_agent",
-        "insight": response.content,
+        "insight": _strip_em_dashes(response.content),
         "data_summary": {"table": _df_to_records(tool_result.get("table"))},
         "tables_used": tool_result["tables_used"],
         "tools_called": [tool_result["tool"]],
     }
 
 
-def run_funnel_agent(data: dict, filters: dict, question: str, llm: ChatOpenAI, history: list = None) -> dict:
+def run_funnel_agent(data: dict, filters: dict, question: str, llm, history: list = None) -> dict:
     tool_result = analyze_funnel_dropoffs(data, filters)
     prompt = f"{_filter_ctx(filters)}User question: {question}\n\nData:\n{tool_result['summary']}"
     response = llm.invoke(_build_messages(_FUNNEL_SYS, prompt, history))
     return {
         "agent": "funnel_agent",
-        "insight": response.content,
+        "insight": _strip_em_dashes(response.content),
         "data_summary": {"funnel_data": tool_result.get("funnel_data", [])},
         "tables_used": tool_result["tables_used"],
         "tools_called": [tool_result["tool"]],
     }
 
 
-def run_borrower_quality_agent(data: dict, filters: dict, question: str, llm: ChatOpenAI, history: list = None) -> dict:
+def run_borrower_quality_agent(data: dict, filters: dict, question: str, llm, history: list = None) -> dict:
     tool_result = analyze_borrower_quality(data, filters)
     prompt = f"{_filter_ctx(filters)}User question: {question}\n\nData:\n{tool_result['summary']}"
     response = llm.invoke(_build_messages(_BORROWER_QUALITY_SYS, prompt, history))
     return {
         "agent": "borrower_quality_agent",
-        "insight": response.content,
+        "insight": _strip_em_dashes(response.content),
         "data_summary": {
             "scale_ads": tool_result.get("scale_ads", []),
             "pause_ads": tool_result.get("pause_ads", []),
@@ -140,7 +150,7 @@ def run_borrower_quality_agent(data: dict, filters: dict, question: str, llm: Ch
     }
 
 
-def run_copy_gen_agent(data: dict, filters: dict, question: str, llm: ChatOpenAI, history: list = None) -> dict:
+def run_copy_gen_agent(data: dict, filters: dict, question: str, llm, history: list = None) -> dict:
     winners = get_winning_creatives(data, filters, top_n=3)
     import json
     context = json.dumps(winners, ensure_ascii=False, indent=2)
@@ -152,20 +162,20 @@ def run_copy_gen_agent(data: dict, filters: dict, question: str, llm: ChatOpenAI
     response = llm.invoke(_build_messages(_COPY_GEN_SYS, prompt, history))
     return {
         "agent": "copy_gen_agent",
-        "insight": response.content,
+        "insight": _strip_em_dashes(response.content),
         "data_summary": {"winning_creatives": winners},
         "tables_used": ["ad_quality_view", "creative_library"],
         "tools_called": ["get_winning_creatives"],
     }
 
 
-def run_platform_agent(data: dict, filters: dict, question: str, llm: ChatOpenAI, history: list = None) -> dict:
+def run_platform_agent(data: dict, filters: dict, question: str, llm, history: list = None) -> dict:
     tool_result = compare_platforms(data, filters)
     prompt = f"{_filter_ctx(filters)}User question: {question}\n\nData:\n{tool_result['summary']}"
     response = llm.invoke(_build_messages(_PLATFORM_SYS, prompt, history))
     return {
         "agent": "platform_comparison_agent",
-        "insight": response.content,
+        "insight": _strip_em_dashes(response.content),
         "data_summary": {"table": _df_to_records(tool_result.get("table"))},
         "tables_used": tool_result["tables_used"],
         "tools_called": [tool_result["tool"]],
@@ -183,7 +193,7 @@ AGENT_DISPATCH = {
 }
 
 
-def run_agents(agent_names: list[str], data: dict, filters: dict, question: str, llm: ChatOpenAI, history: list = None) -> list[dict]:
+def run_agents(agent_names: list[str], data: dict, filters: dict, question: str, llm, history: list = None) -> list[dict]:
     outputs = []
     for name in agent_names:
         fn = AGENT_DISPATCH.get(name)

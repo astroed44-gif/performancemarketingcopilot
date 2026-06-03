@@ -5,16 +5,21 @@ from __future__ import annotations
 import json
 import re
 import pandas as pd
-from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
+from langchain_core.messages import AIMessage
 from data.metrics import top_ads_by_quality, ads_to_pause, enrich_ad_quality_view
 
 _SYNTHESIZER_SYSTEM = """You are the head of performance marketing for a digital lending app in India.
 You receive insights from multiple specialist agents and must synthesize them into a single clear answer.
 
+STYLE RULES (strictly follow):
+- NEVER use em dashes (the character that looks like --). Use a plain hyphen (-) or rewrite the sentence instead.
+- Do not use curly/smart quotes. Use straight quotes only.
+- Keep language direct and concise.
+
 Your response MUST be valid JSON in this exact shape:
 {
-  "decision": "<one bold sentence — the main answer>",
+  "decision": "<one bold sentence - the main answer>",
   "why": "<2-3 sentences explaining the reasoning>",
   "evidence": "<key data points that support this, with numbers. If the user asked for ad copies, include the actual generated ad copies here line by line>",
   "recommended_action": "<Scale | Pause | Test | Investigate>",
@@ -24,14 +29,14 @@ Your response MUST be valid JSON in this exact shape:
   "evidence_note": "<one sentence describing what the evidence panel should show>"
 }
 
-Be specific. Use ₹ for currency. Name actual ads when relevant.
+Be specific. Use Rs for currency. Name actual ads when relevant.
 CRITICAL RULE FOR COPIES: If the agent output contains generated ad copies, you MUST include the actual copy text in the `evidence` field or `decision` field so they are not lost. DO NOT summarize them away!
 evidence_type mapping:
-- performance/borrower_quality questions → "ad_table" or "scatter"
-- funnel questions → "funnel"
-- creative questions → "creative"
-- copy_gen questions → "copy_gen"
-- platform comparison → "platform"
+- performance/borrower_quality questions -> "ad_table" or "scatter"
+- funnel questions -> "funnel"
+- creative questions -> "creative"
+- copy_gen questions -> "copy_gen"
+- platform comparison -> "platform"
 """
 
 _BRIEFING_SYSTEM = """You are a weekly marketing analyst. Given ad quality data, produce a weekly briefing.
@@ -46,7 +51,14 @@ Scale: top 3 by quality score. Pause: bottom 3. Be specific and data-driven.
 """
 
 
-def synthesize(agent_outputs: list[dict], question: str, llm: ChatOpenAI, history: list = None) -> dict:
+def _strip_em_dashes(text: str) -> str:
+    """Replace em dashes and related Unicode dashes with a plain hyphen."""
+    for ch in "\u2014\u2013\u2012\u2015":
+        text = text.replace(ch, "-")
+    return text
+
+
+def synthesize(agent_outputs: list[dict], question: str, llm, history: list = None) -> dict:
     from langchain_core.messages import AIMessage
     if len(agent_outputs) == 1 and agent_outputs[0].get("agent") == "chitchat_agent":
         return {
@@ -75,11 +87,17 @@ def synthesize(agent_outputs: list[dict], question: str, llm: ChatOpenAI, histor
     messages.append(HumanMessage(content=prompt))
 
     response = llm.invoke(messages)
-    raw = response.content.strip()
+    raw = _strip_em_dashes(response.content.strip())
     match = re.search(r"\{.*\}", raw, re.DOTALL)
     if match:
         try:
             result = json.loads(match.group())
+            # Strip em dashes from all string fields
+            for key, val in result.items():
+                if isinstance(val, str):
+                    result[key] = _strip_em_dashes(val)
+                elif isinstance(val, list):
+                    result[key] = [_strip_em_dashes(v) if isinstance(v, str) else v for v in val]
             result["agent_trace"] = agent_outputs
             return result
         except json.JSONDecodeError:
@@ -103,13 +121,13 @@ def generate_weekly_briefing(_llm_placeholder: str, _data_hash: str, aq_json: st
     Cached for 1 hour. _llm_placeholder and _data_hash are cache key helpers.
     aq_json is the serialized ad_quality_view DataFrame.
     """
-    from langchain_openai import ChatOpenAI
+    from langchain_anthropic import ChatAnthropic
     from langchain_core.messages import SystemMessage, HumanMessage
     import os
     from dotenv import load_dotenv
     load_dotenv()
-    api_key = os.getenv("OPENAI_API_KEY", "")
-    llm = ChatOpenAI(model="gpt-4o", api_key=api_key, max_tokens=1024)
+    api_key = os.getenv("ANTHROPIC_API_KEY", "")
+    llm = ChatAnthropic(model="claude-haiku-4-5-20251001", api_key=api_key, max_tokens=1024)
 
     aq_data = json.loads(aq_json)
     summary_lines = []
@@ -135,7 +153,7 @@ def generate_weekly_briefing(_llm_placeholder: str, _data_hash: str, aq_json: st
         "scale_these": [],
         "pause_these": [],
         "funnel_alert": "Unable to generate briefing.",
-        "test_next_week": "—",
+        "test_next_week": "N/A",
     }
 
 

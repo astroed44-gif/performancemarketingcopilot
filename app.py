@@ -24,25 +24,34 @@ def _get_data() -> dict:
 def _get_llm():
     global _llm_cache
     if _llm_cache is None:
-        key = os.getenv("OPENAI_API_KEY", "")
+        key = os.getenv("ANTHROPIC_API_KEY", "")
         if key:
-            from langchain_openai import ChatOpenAI
-            _llm_cache = ChatOpenAI(model="gpt-4o", api_key=key, max_tokens=2048)
+            from langchain_anthropic import ChatAnthropic
+            _llm_cache = ChatAnthropic(model="claude-haiku-4-5-20251001", api_key=key, max_tokens=2048)
     return _llm_cache
+
+
+def _get_router_llm():
+    """Lightweight LLM instance for routing only - fewer tokens needed."""
+    key = os.getenv("ANTHROPIC_API_KEY", "")
+    if key:
+        from langchain_anthropic import ChatAnthropic
+        return ChatAnthropic(model="claude-haiku-4-5-20251001", api_key=key, max_tokens=256)
+    return None
 
 
 def _pct(v) -> str:
     try:
         return f"{float(v) * 100:.1f}%"
     except Exception:
-        return "—"
+        return "N/A"
 
 
 def _inr(v) -> str:
     try:
         return f"₹{float(v):,.0f}"
     except Exception:
-        return "—"
+        return "N/A"
 
 
 def _compute_metrics(aq) -> dict:
@@ -136,13 +145,13 @@ def api_chat():
 
     if not llm:
         def err_gen():
-            yield f"data: {json.dumps({'status': 'complete', 'result': {'decision': '⚠️ No OpenAI API key found. Add OPENAI_API_KEY to your Vercel Environment Variables and redeploy.', 'why': '', 'evidence': '', 'recommended_action': 'Investigate', 'action_items': ['Go to Vercel Dashboard', 'Add OPENAI_API_KEY in Settings > Environment Variables', 'Redeploy the project'], 'confidence': 0.0, 'evidence_type': 'ad_table', 'evidence_data': {}, 'agent_trace': []}})}\n\n"
+            yield f"data: {json.dumps({'status': 'complete', 'result': {'decision': '⚠️ No Anthropic API key found. Add ANTHROPIC_API_KEY to your .env file and restart.', 'why': '', 'evidence': '', 'recommended_action': 'Investigate', 'action_items': ['Add ANTHROPIC_API_KEY=sk-ant-... to your .env file', 'Restart the server'], 'confidence': 0.0, 'evidence_type': 'ad_table', 'evidence_data': {}, 'agent_trace': []}})}\n\n"
         return Response(err_gen(), content_type='text/event-stream')
 
     def generate():
         try:
             yield f"data: {json.dumps({'status': 'progress', 'message': '🔀 Routing your question...'})}\n\n"
-            route = route_query(question, llm, history)
+            route = route_query(question, _get_router_llm() or llm, history)
             suggested = route.get("suggested_agents", ["performance"])
             
             outputs = []
@@ -169,7 +178,12 @@ def api_chat():
             yield f"data: {json.dumps({'status': 'complete', 'result': answer})}\n\n"
         except Exception as e:
             app.logger.error("Chat error: %s", e, exc_info=True)
-            yield f"data: {json.dumps({'status': 'error', 'message': str(e)})}\n\n"
+            error_msg = str(e)
+            # Extract clean message from Anthropic API errors
+            import re
+            match = re.search(r"'message':\s*'([^']+)'", error_msg)
+            clean = match.group(1) if match else error_msg
+            yield f"data: {json.dumps({'status': 'error', 'message': f'❌ API Error: {clean}'})}\n\n"
 
     return Response(generate(), content_type='text/event-stream')
 

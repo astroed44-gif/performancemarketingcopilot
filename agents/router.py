@@ -5,7 +5,6 @@ Uses Claude to classify the intent.
 from __future__ import annotations
 import json
 import re
-from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
 
 AGENT_TYPES = [
@@ -23,7 +22,7 @@ Your job is not to answer the question.
 Your job is to classify the user query into exactly one route:
 PERFORMANCE, CREATIVE, FUNNEL, BORROWER_QUALITY, COPY_GENERATION, MULTI, GENERAL.
 
-Return structured JSON only:
+Return structured JSON only (no prose, no em dashes, no markdown):
 {
   "route": "...",
   "reason": "...",
@@ -33,16 +32,16 @@ Return structured JSON only:
 Valid agent types for suggested_agents: performance, creative, funnel, borrower_quality, copy_gen, platform_comparison, chitchat.
 
 Use MULTI when the query requires more than one dimension, such as scale/pause decisions, campaign diagnosis, weekly planning, or borrower-quality recommendations.
-For "which ads to scale/pause" → route: MULTI, suggested_agents: ["performance", "borrower_quality"]
-For funnel questions → route: FUNNEL, suggested_agents: ["funnel"]
-For creative effectiveness → route: CREATIVE, suggested_agents: ["creative", "borrower_quality"]
-For copy generation → route: COPY_GENERATION, suggested_agents: ["copy_gen"]
-For platform questions → route: PERFORMANCE, suggested_agents: ["platform_comparison"]
-For casual conversation/greetings → route: GENERAL, suggested_agents: ["chitchat"]
+For "which ads to scale/pause" -> route: MULTI, suggested_agents: ["performance", "borrower_quality"]
+For funnel questions -> route: FUNNEL, suggested_agents: ["funnel"]
+For creative effectiveness -> route: CREATIVE, suggested_agents: ["creative", "borrower_quality"]
+For copy generation -> route: COPY_GENERATION, suggested_agents: ["copy_gen"]
+For platform questions -> route: PERFORMANCE, suggested_agents: ["platform_comparison"]
+For casual conversation/greetings -> route: GENERAL, suggested_agents: ["chitchat"]
 """
 
 
-def route_query(question: str, llm: ChatOpenAI, history: list = None) -> dict:
+def route_query(question: str, llm, history: list = None) -> dict:
     from langchain_core.messages import AIMessage
     messages = [SystemMessage(content=_ROUTER_SYSTEM)]
     if history:
